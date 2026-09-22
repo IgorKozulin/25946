@@ -2,12 +2,14 @@
 #define _XOPEN_SOURCE 700
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ulimit.h>
 
 extern char **environ;
 
@@ -120,41 +122,38 @@ static int print_process_ids(void)
 
 static void print_rlim_value(const char *name, rlim_t value);
 
-static int print_open_file_limit(void)
+static int print_ulimit(void)
 {
-    struct rlimit limit;
+    long value = ulimit(UL_GETFSIZE);
 
-    if (getrlimit(RLIMIT_NOFILE, &limit) == -1) {
-        perror("getrlimit(RLIMIT_NOFILE)");
+    if (value == -1) {
+        perror("ulimit(UL_GETFSIZE)");
         return -1;
     }
-    print_rlim_value("open_file_limit", limit.rlim_cur);
+
+    printf("ulimit=%ld\n", value);
     return 0;
 }
 
-static int set_open_file_limit(const char *argument)
+static int set_ulimit(const char *argument)
 {
     unsigned long long value;
-    struct rlimit limit;
 
     if (parse_unsigned(argument, "-U", &value) == -1) {
         return -1;
     }
-    if (getrlimit(RLIMIT_NOFILE, &limit) == -1) {
-        perror("getrlimit(RLIMIT_NOFILE)");
+
+    if (value > LONG_MAX) {
+        fprintf(stderr, "-U value is too large: %s\n", argument);
         return -1;
     }
-    if ((rlim_t)value > limit.rlim_max) {
-        fprintf(stderr, "-U value exceeds the hard open-file limit: %s\n",
-                argument);
+
+    if (ulimit(UL_SETFSIZE, (long)value) == -1) {
+        perror("ulimit(UL_SETFSIZE)");
         return -1;
     }
-    limit.rlim_cur = (rlim_t)value;
-    if (setrlimit(RLIMIT_NOFILE, &limit) == -1) {
-        perror("setrlimit(RLIMIT_NOFILE)");
-        return -1;
-    }
-    printf("open_file_limit_set=%llu\n", value);
+
+    printf("ulimit_set=%llu\n", value);
     return 0;
 }
 
@@ -273,9 +272,9 @@ static int apply_event(const option_event *event)
     case 'p':
         return print_process_ids();
     case 'u':
-        return print_open_file_limit();
+    return print_ulimit();
     case 'U':
-        return set_open_file_limit(event->argument);
+        return set_ulimit(event->argument);
     case 'c':
         return print_core_limit();
     case 'C':
@@ -352,3 +351,27 @@ cleanup:
     free(events);
     return status;
 }
+
+// === === === === === ===
+
+//-i	                Выводит реальные и эффективные UID/GID процесса
+//-s	                Делает текущий процесс лидером группы процессов через setpgid(0, 0)
+//-p	                Выводит PID, PPID и идентификатор группы процессов
+//-u	                Выводит текущий лимит ulimit
+//-Uчисло	            Устанавливает лимит ulimit, например -U64
+//-c	                Выводит текущий лимит размера core-файла в байтах
+//-Cчисло	            Устанавливает лимит core-файла, например -C0
+//-d	                Выводит текущую рабочую директорию
+//-v	                Печатает всё окружение процесса
+//-VИМЯ=ЗНАЧЕНИЕ	    Устанавливает или заменяет переменную окружения
+
+// === === === === === ===
+
+//./options -i
+//./options -p
+//./options -s -p
+//./options -d
+//./options -VTEST=hello -v
+//./options -C0 -c
+
+// === === === === === ===
