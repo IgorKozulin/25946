@@ -45,3 +45,10 @@ temp/
 !.env.example
 *.key
 *.pem
+
+# Local SSH credentials must never be committed.
+gitnsu
+gitnsu.pub
+
+# Local clone of the course repository.
+25946-main/
