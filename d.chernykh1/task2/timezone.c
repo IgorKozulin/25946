@@ -2,7 +2,7 @@
 #include <time.h>
 #include <stdlib.h>
 int main(int argc, char *argv[]) {
-    if (putenv("TZ=America/Los_Angeles") != 0) perror("putenv");
+    if (putenv("TZ=PST+8") != 0) perror("putenv");
     time_t a = time(NULL);
     struct tm *now = localtime(&a);
     if (now == NULL){perror("localtime"); return 1;}
