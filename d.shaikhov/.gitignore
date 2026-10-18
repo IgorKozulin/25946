@@ -1,0 +1,10 @@
+task_*/*
+
+!task_*/*.c
+!task_*/Makefile
+!task_*/*.txt
+
+core
+core.*
+*.o
+*.out

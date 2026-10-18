@@ -7,9 +7,8 @@ struct Node {
     struct Node *next;
 };
 
-void append(struct Node **head, char *str) {
+void add(struct Node **head, char *str) {
     struct Node *new_node;
-    struct Node *current;
 
     new_node = malloc(sizeof(struct Node));
 
@@ -27,26 +26,15 @@ void append(struct Node **head, char *str) {
     }
 
     strcpy(new_node->data, str);
-    new_node->next = NULL;
 
-    if (*head == NULL) {
-        *head = new_node;
-        return;
-    }
-
-    current = *head;
-
-    while (current->next != NULL) {
-        current = current->next;
-    }
-
-    current->next = new_node;
+    new_node->next = *head;
+    *head = new_node;
 }
 
 void free_list(struct Node *head) {
     struct Node *next;
 
- 	   while (head != NULL) {
+    while (head != NULL) {
         next = head->next;
 
         free(head->data);
@@ -63,18 +51,23 @@ int main() {
     char buffer[1024];
 
     while (1) {
-        fgets(buffer, sizeof(buffer), stdin);
+
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            break;
+        }
 
         if (buffer[0] == '.') {
             break;
         }
 
-        if (buffer[strlen(buffer) - 1] == '\n') {
+        if (strlen(buffer) > 0 &&
+            buffer[strlen(buffer) - 1] == '\n') {
+
             buffer[strlen(buffer) - 1] = '\0';
         }
 
         if (strlen(buffer) > 0) {
-            append(&head, buffer);
+            add(&head, buffer);
         }
     }
 
