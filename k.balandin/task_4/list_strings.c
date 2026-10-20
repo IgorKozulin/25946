@@ -81,10 +81,6 @@ int main(void)
             break;
         }
 
-        if (len == 0) {
-            continue;
-        }
-
         append(&head, buffer);
     }
 
