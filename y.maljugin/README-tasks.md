@@ -14,6 +14,8 @@ with `make`. The generated executables are ignored by Git.
 | 10 | `run_command` | `./run_command sh -c 'exit 7'` |
 | 17 | `line_editor` | `./line_editor` (interactive terminal; Ctrl-D on an empty line exits) |
 | 18 | `my_ls` | `./my_ls /etc/passwd /tmp /dev/null` |
+| 21 | `beeper` | `./beeper` (Ctrl-C rings; Ctrl-\\ reports the count and exits) |
+| 25 | `pipe_upper` | `./pipe_upper` (type text, then Ctrl-D to finish) |
 
 Task 6 deliberately reuses the line-index implementation from Task 5 and adds
 the five-second alarm. Task 7 uses `mmap` instead of `read`/`lseek` for file
@@ -22,6 +24,10 @@ access and uses standard I/O for output after the signal handler sets a flag.
 Task 17 edits one logical line at a time in a terminal. Backspace removes a
 character, Ctrl-U clears the line, Ctrl-W removes the last word, and words wrap
 at 40 columns. Task 18 reports file metadata without entering directories.
+
+Task 21 handles SIGINT and SIGQUIT without using unsafe stdio calls inside signal
+handlers. Task 25 sends standard input from a parent process through a pipe to
+its child, which converts ASCII letters to uppercase and prints the result.
 
 The instructor's repository did not contain a Task 8 statement when these
 solutions were prepared. No Task 8 solution is invented here.
