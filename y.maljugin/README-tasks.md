@@ -1,4 +1,4 @@
-# Solaris assignments 3-10
+# Solaris assignments
 
 All programs are compiled and run on Solaris from their respective directories
 with `make`. The generated executables are ignored by Git.
@@ -10,12 +10,38 @@ with `make`. The generated executables are ignored by Git.
 | 5 | `line_lookup` | `./line_lookup ../../Task_5/Task_5.txt` |
 | 6 | `line_lookup_alarm` | `./line_lookup_alarm ../../Task_5/Task_5.txt` |
 | 7 | `line_lookup_mmap` | `./line_lookup_mmap ../../Task_5/Task_5.txt` |
+| 8 | `locked_editor` | `EDITOR=vi ./locked_editor test.txt` (see locking note below) |
 | 9 | `process_manager` | `./process_manager ../../Task_9/Task_9.txt` |
 | 10 | `run_command` | `./run_command sh -c 'exit 7'` |
+| 11 | `execvpe_demo` | `./execvpe_demo env` |
+| 16 | `one_key` | `./one_key` (answer with one key, no Enter) |
+| 17 | `line_editor` | `./line_editor` (interactive terminal; Ctrl-D on an empty line exits) |
+| 18 | `my_ls` | `./my_ls /etc/passwd /tmp /dev/null` |
+| 19 | `match_files` | `./match_files` (enter `*.c`) |
+| 20 | `match_paths` | `./match_paths` (enter `../Task_1?/Makefile`) |
+| 21 | `beeper` | `./beeper` (Ctrl-C rings; Ctrl-\\ reports the count and exits) |
+| 25 | `pipe_upper` | `./pipe_upper` (type text, then Ctrl-D to finish) |
+| 26 | `popen_upper` | `./popen_upper` (type text, then Ctrl-D) |
+| 27 | `count_blank` | `./count_blank text.txt` |
+| 28 | `sorted_random` | `./sorted_random` |
 
 Task 6 deliberately reuses the line-index implementation from Task 5 and adds
 the five-second alarm. Task 7 uses `mmap` instead of `read`/`lseek` for file
 access and uses standard I/O for output after the signal handler sets a flag.
+
+Task 17 edits one logical line at a time in a terminal. Backspace removes a
+character, Ctrl-U clears the line, Ctrl-W removes the last word, and words wrap
+at 40 columns. Task 18 reports file metadata without entering directories.
+
+Task 21 handles SIGINT and SIGQUIT without using unsafe stdio calls inside signal
+handlers. Task 25 sends standard input from a parent process through a pipe to
+its child, which converts ASCII letters to uppercase and prints the result.
+
+Task 8 holds an `fcntl` write lock while an editor runs through `system`.
+Advisory locking only affects cooperating programs. Mandatory locking requires
+the file's set-group-ID bit, no group execute bit, and filesystem support;
+use a disposable group-writable test file, and restore its original mode after
+the classmate experiment. This program does not silently change file permissions.
 
 The instructor's repository did not contain a Task 8 statement when these
 solutions were prepared. No Task 8 solution is invented here.
