@@ -1,6 +1,27 @@
+
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+
+#ifdef _WIN32
+typedef unsigned int uid_t;
+
+static uid_t getuid(void)
+{
+    return 0;
+}
+
+static uid_t geteuid(void)
+{
+    return 0;
+}
+
+static int setuid(uid_t uid)
+{
+    (void)uid;
+    return 0;
+}
+#endif
 
 void print_ids(void)
 {

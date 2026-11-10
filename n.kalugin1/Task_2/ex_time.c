@@ -1,61 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
-int main(void)
+int main(int argc, char *argv[])
 {
-    time_t current_time;
-    struct tm *california_time;
-    char timezone_name[16];
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <IANA_timezone>\n", argv[0]);
+        fprintf(stderr, "Example: %s Europe/Moscow\n", argv[0]);
+        return 1;
+    }
+
+    const char *tz = argv[1];
 
 #ifdef _WIN32
-    // Windows CRT понимает зону в формате PST8PDT.
-    if (_putenv_s("TZ", "PST8PDT") != 0)
-    {
-        fprintf(stderr, "Unable to set TZ\n");
+    if (_putenv_s("TZ", tz) != 0) {
+        fprintf(stderr, "Unable to set TZ to %s\n", tz);
         return 1;
     }
     _tzset();
 #else
-    // В Unix задаём часовую зону по имени из базы IANA.
-    if (setenv("TZ", "America/Los_Angeles", 1) == -1)
-    {
+    if (setenv("TZ", tz, 1) == -1) {
         perror("setenv");
         return 1;
     }
     tzset();
 #endif
 
-    current_time = time(NULL);
-    if (current_time == (time_t)-1)
-    {
-        perror("time");
-        return 1;
-    }
+    time_t now = time(NULL);    //возвращает число секунд, прошедших с 01.01.1970
+    if (now == (time_t)-1) { perror("time"); return 1; }
 
-    california_time = localtime(&current_time);
-    if (california_time == NULL)
-    {
-        perror("localtime");
-        return 1;
-    }
+    struct tm *lt = localtime(&now);    //число преобразуется во время
+    if (!lt) { perror("localtime"); return 1; }
 
-    // Сокращение PST/PDT зависит от даты и летнего времени.
-    if (strftime(timezone_name, sizeof(timezone_name), "%Z", california_time) == 0)
-    {
-        fprintf(stderr, "Unable to format timezone name\n");
-        return 1;
-    }
+    char zone_abbr[16] = {0};    // Буфер для хранения аббревиатуры часового пояса  
+    strftime(zone_abbr, sizeof(zone_abbr), "%Z", lt);
 
-    // В tm месяц начинается с нуля, а год отсчитывается от 1900.
-    printf("%02d/%02d/%04d %02d:%02d:%02d %s\n",
-           california_time->tm_mon + 1,
-           california_time->tm_mday,
-           california_time->tm_year + 1900,
-           california_time->tm_hour,
-           california_time->tm_min,
-           california_time->tm_sec,
-           timezone_name);
+    printf("%s: %02d/%02d/%04d %02d:%02d:%02d %s\n",
+           tz,
+           lt->tm_mon + 1, lt->tm_mday, lt->tm_year + 1900,
+           lt->tm_hour, lt->tm_min, lt->tm_sec,
+           zone_abbr);
 
     return 0;
 }

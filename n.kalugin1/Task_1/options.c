@@ -1,198 +1,140 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
+#include <ulimit.h>
 #include <sys/resource.h>
-#include <limits.h>
 #include <string.h>
-#include <errno.h>
 
-// Программа рассчитана на Solaris/Linux: Windows не предоставляет эти POSIX API.
+#define MAXOPTS 100
+
 extern char **environ;
 
-struct Option
+//Выполняет одну опцию c со значением arg
+void do_option(int c, char *arg)
 {
-    int name;
-    char *argument;
-};
-
-void print_limit(rlim_t value, int is_byte_count)
-{
-    if (value == RLIM_INFINITY)
-        printf("unlimited\n");
-    else if (is_byte_count)
-        printf("%llu bytes\n", (unsigned long long)value);
-    else
-        printf("%llu\n", (unsigned long long)value);
-}
-
-int parse_limit(const char *text, rlim_t *value)
-{
+    char buf[1024];
+    long newlim;
     char *end;
-    unsigned long long number;
-
-    if (text == NULL || text[0] == '\0' || text[0] == '-')
-        return 0;
-
-    errno = 0;
-    number = strtoull(text, &end, 10);
-    if (errno == ERANGE || *end != '\0')
-        return 0;
-
-    *value = (rlim_t)number;
-    if ((unsigned long long)*value != number)
-        return 0;
-
-    return 1;
-}
-
-void print_resource_limit(int resource, int is_byte_count)
-{
-    struct rlimit limit;
-
-    if (getrlimit(resource, &limit) == -1)
-    {
-        perror("getrlimit");
-        return;
-    }
-
-    print_limit(limit.rlim_cur, is_byte_count);
-}
-
-void change_resource_limit(int resource, const char *text)
-{
-    struct rlimit limit;
-    rlim_t value;
-
-    if (!parse_limit(text, &value))
-    {
-        fprintf(stderr, "Invalid limit value: %s\n", text);
-        return;
-    }
-
-    if (getrlimit(resource, &limit) == -1)
-    {
-        perror("getrlimit");
-        return;
-    }
-
-    // Меняем мягкий лимит, не трогая установленный системой жёсткий лимит.
-    limit.rlim_cur = value;
-    if (setrlimit(resource, &limit) == -1)
-        perror("setrlimit");
-}
-
-void run_option(const struct Option *option)
-{
-    char directory[PATH_MAX];
     char *equal_sign;
     char *name;
     size_t name_length;
-    size_t i;
+    struct rlimit rl;
+    char **env;
 
-    switch (option->name)
-    {
-        case 'i':
-            printf("Real UID: %lu, Effective UID: %lu\n",
-                   (unsigned long)getuid(), (unsigned long)geteuid());
-            printf("Real GID: %lu, Effective GID: %lu\n",
-                   (unsigned long)getgid(), (unsigned long)getegid());
+    switch (c) {
+    case 'i':
+        printf("uid=%d euid=%d gid=%d egid=%d\n",
+               (int)getuid(), (int)geteuid(),
+               (int)getgid(), (int)getegid());
+        break;
+    case 's':
+        if (setpgid(0, 0) == -1)
+            perror("setpgid");
+        else
+            printf("процесс стал лидером группы\n");
+        break;
+    case 'p':
+        printf("pid=%d ppid=%d pgid=%d\n",
+               (int)getpid(), (int)getppid(), (int)getpgrp());
+        break;
+    case 'u':
+        printf("ulimit=%ld\n", ulimit(UL_GETFSIZE));
+        break;
+    case 'U':
+        newlim = strtol(arg, &end, 10);
+        if (*end != '\0' || newlim < 0) {
+            printf("плохое значение для -U: %s\n", arg);
             break;
-        case 's':
-            if (setpgid(0, 0) == -1)
-                perror("setpgid");
+        }
+        if (ulimit(UL_SETFSIZE, newlim) == -1)
+            perror("ulimit");
+        break;
+    case 'c':
+        if (getrlimit(RLIMIT_CORE, &rl) == -1)
+            perror("getrlimit");
+        else if (rl.rlim_cur == RLIM_INFINITY)
+            printf("core limit=unlimited\n");
+        else
+            printf("core limit=%ld\n", (long)rl.rlim_cur);
+        break;
+    case 'C':
+        newlim = strtol(arg, &end, 10);
+        if (*end != '\0' || newlim < 0) {
+            printf("плохое значение для -C: %s\n", arg);
             break;
-        case 'p':
-            printf("PID: %ld, PPID: %ld, PGID: %ld\n",
-                   (long)getpid(), (long)getppid(), (long)getpgrp());
+        }
+        if (getrlimit(RLIMIT_CORE, &rl) == -1) {
+            perror("getrlimit");
             break;
-        case 'u':
-            print_resource_limit(RLIMIT_NOFILE, 0);
+        }
+        rl.rlim_cur = newlim;
+        if (setrlimit(RLIMIT_CORE, &rl) == -1)
+            perror("setrlimit");
+        break;
+    case 'd':
+        if (getcwd(buf, sizeof(buf)) != NULL)
+            printf("cwd=%s\n", buf);
+        else
+            perror("getcwd");
+        break;
+    case 'v':
+        for (env = environ; *env != NULL; env++)
+            printf("%s\n", *env);
+        break;
+    case 'V':
+        equal_sign = strchr(arg, '=');  //ищем символ '=' в строке arg
+        if (equal_sign == NULL || equal_sign == arg) {
+            printf("плохое значение для -V: %s (нужно имя=значение)\n", arg);
             break;
-        case 'U':
-            change_resource_limit(RLIMIT_NOFILE, option->argument);
-            break;
-        case 'c':
-            print_resource_limit(RLIMIT_CORE, 1);
-            break;
-        case 'C':
-            change_resource_limit(RLIMIT_CORE, option->argument);
-            break;
-        case 'd':
-            if (getcwd(directory, sizeof(directory)) == NULL)
-                perror("getcwd");
-            else
-                printf("%s\n", directory);
-            break;
-        case 'v':
-            for (i = 0; environ[i] != NULL; ++i)
-                printf("%s\n", environ[i]);
-            break;
-        case 'V':
-            // setenv принимает имя и значение отдельно, поэтому делим NAME=VALUE.
-            equal_sign = strchr(option->argument, '=');
-            if (equal_sign == NULL || equal_sign == option->argument)
-            {
-                fprintf(stderr, "Expected -Vname=value\n");
-                break;
-            }
+        }
 
-            name_length = (size_t)(equal_sign - option->argument);
-            name = (char *)malloc(name_length + 1);
-            if (name == NULL)
-            {
-                perror("malloc");
-                break;
-            }
-
-            memcpy(name, option->argument, name_length);
-            name[name_length] = '\0';
-            if (setenv(name, equal_sign + 1, 1) == -1)
-                perror("setenv");
-            free(name);
+        name_length = (size_t)(equal_sign - arg);   //вычисляем длину имени переменной
+        name = (char *)malloc(name_length + 1);     //выделяем память для имени переменной
+        if (name == NULL) {
+            perror("malloc");      
             break;
+        }
+
+        memcpy(name, arg, name_length); //копируем имя переменной в выделенную память
+        name[name_length] = '\0';   //добавляем завершающий нулевой символ
+        if (setenv(name, equal_sign + 1, 1) != 0)   
+            perror("setenv");
+        free(name);
+        break;
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[])  
 {
-    struct Option *options;
-    size_t capacity = 0;
-    int count = 0;
-    int option_name;
+    int c;
+    int n = 0;
     int i;
+    int opts[MAXOPTS];
+    char *args[MAXOPTS];
 
-    for (i = 1; i < argc; ++i)
-        capacity += strlen(argv[i]);
-
-    if (capacity == 0)
-        capacity = 1;
-
-    options = (struct Option *)malloc(capacity * sizeof(struct Option));
-    if (options == NULL)
-    {
-        perror("malloc");
-        return 1;
+    if (argc == 1) {
+        printf("Использование: %s [-i] [-s] [-p] [-u] [-Uзначение] [-c] [-Cзначение] [-d] [-v] [-Vимя=значение]\n", argv[0]);
+        return 0;
     }
 
-    opterr = 0;
-    while ((option_name = getopt(argc, argv, "ispuU:cC:dvV:")) != -1)
-    {
-        if (option_name == '?')
-        {
-            fprintf(stderr, "Unknown or incomplete option: -%c\n", optopt);
+    /* Проход 1: собираем опции слева направо */
+    while ((c = getopt(argc, argv, "ispuU:cC:dvV:")) != -1) {
+        if (c == '?') {
+            printf("неизвестная опция\n");
             continue;
         }
-
-        options[count].name = option_name;
-        options[count].argument = optarg;
-        ++count;
+        if (n >= MAXOPTS) {
+            printf("слишком много опций\n");
+            return 1;
+        }
+        opts[n] = c;
+        args[n] = optarg;
+        n++;
     }
 
-    // getopt разбирает слева направо, а по условию опции выполняются справа налево.
-    for (i = count - 1; i >= 0; --i)
-        run_option(&options[i]);
-
-    free(options);
+    /* Проход 2: выполняем справа налево */
+    for (i = n - 1; i >= 0; i--) {
+        do_option(opts[i], args[i]);
+    }
     return 0;
 }
