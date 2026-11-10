@@ -52,3 +52,6 @@ gitnsu.pub
 
 # Local clone of the course repository.
 25946-main/
+
+# Microsoft Office lock files
+~$*
