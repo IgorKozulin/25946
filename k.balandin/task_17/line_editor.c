@@ -10,6 +10,7 @@
 #define MAX_BUF 4096
 #define LINE_WIDTH 40
 #define PROMPT "> "
+#define UNDO_MAX 256
 
 static struct termios orig_termios;
 static int raw_enabled = 0;
@@ -17,6 +18,10 @@ static unsigned char erase_char;
 static unsigned char kill_char;
 static char buffer[MAX_BUF];
 static int pos = 0;
+
+static char undo_stack[UNDO_MAX][MAX_BUF];
+static int  undo_pos_stack[UNDO_MAX];
+static int  undo_top = 0;
 
 static void disable_raw_mode(void) {
     if (raw_enabled) {
@@ -39,7 +44,7 @@ static void enable_raw_mode(void) {
     kill_char  = orig_termios.c_cc[VKILL];
 
     struct termios raw = orig_termios;
-    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     raw.c_cc[VMIN]  = 1;
     raw.c_cc[VTIME] = 0;
 
@@ -48,6 +53,26 @@ static void enable_raw_mode(void) {
 
     raw_enabled = 1;
     atexit(disable_raw_mode);
+}
+
+static void undo_push(void) {
+    if (undo_top == UNDO_MAX) {
+        memmove(undo_stack[0], undo_stack[1], (UNDO_MAX - 1) * MAX_BUF);
+        memmove(undo_pos_stack, undo_pos_stack + 1, (UNDO_MAX - 1) * sizeof(int));
+        undo_top--;
+    }
+    memcpy(undo_stack[undo_top], buffer, pos);
+    undo_pos_stack[undo_top] = pos;
+    undo_top++;
+}
+
+static int undo_pop(void) {
+    if (undo_top == 0) return 0;
+    undo_top--;
+    pos = undo_pos_stack[undo_top];
+    memcpy(buffer, undo_stack[undo_top], pos);
+    buffer[pos] = '\0';
+    return 1;
 }
 
 static void redraw(void) {
@@ -135,6 +160,7 @@ int main(void) {
         if (uc == '\n' || uc == '\r') {
             printf("\n");
             pos = 0;
+            undo_top = 0;
             printf("%s", PROMPT);
             fflush(stdout);
             continue;
@@ -142,6 +168,7 @@ int main(void) {
 
         if (uc == erase_char) {
             if (pos > 0) {
+                undo_push();
                 pos--;
                 redraw();
             } else {
@@ -152,6 +179,7 @@ int main(void) {
         }
 
         if (uc == kill_char) {
+            if (pos > 0) undo_push();
             pos = 0;
             redraw();
             continue;
@@ -159,7 +187,18 @@ int main(void) {
 
         if (uc == 23) {
             if (pos > 0) {
+                undo_push();
                 delete_word();
+                redraw();
+            } else {
+                putchar('\a');
+                fflush(stdout);
+            }
+            continue;
+        }
+
+        if (uc == 26) {
+            if (undo_pop()) {
                 redraw();
             } else {
                 putchar('\a');
@@ -170,6 +209,7 @@ int main(void) {
 
         if (isprint(uc)) {
             if (pos < MAX_BUF - 1) {
+                undo_push();
                 buffer[pos++] = (char)uc;
                 buffer[pos] = '\0';
                 redraw();
