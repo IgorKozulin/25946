@@ -5,7 +5,8 @@
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]) {
-    pid_t pid;
+    pid_t child1;
+    pid_t child2;
     int status;
 
     if (argc != 2) {
@@ -13,43 +14,37 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("[PARENT] Starting program. My PID: %d\n", (int)getpid());
-    fflush(stdout);
+    child1 = fork();
 
-    pid = fork();
-
-    if (pid < 0) {
+    if (child1 < 0) {
         printf("Fork error\n");
         return 1;
     }
 
-    if (pid == 0) {
-        printf("[CHILD] I am the child process. My PID: %d\n", (int)getpid());
-
-        fflush(stdout);
-
+    if (child1 == 0) {
         execlp("cat", "cat", argv[1], NULL);
 
         perror("execlp");
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 
-    printf("[PARENT] I am the parent. Child PID: %d\n", (int)pid);
+    waitpid(child1, &status, 0);
 
-    printf("[PARENT] Printing some text while child is working...\n");
+    child2 = fork();
 
-    printf("[PARENT] Waiting for child to finish...\n");
-
-    if (waitpid(pid, &status, 0) == -1) {
-        printf("waitpid error\n");
+    if (child2 < 0) {
+        printf("Fork error\n");
         return 1;
     }
 
-    if (WIFEXITED(status)) {
-        printf("[PARENT] Child exited with status: %d\n", WEXITSTATUS(status));
+    if (child2 == 0) {
+        printf("[CHILD 2] My PID: %d\n", (int)getpid());
+        exit(0);
     }
 
-    printf("[PARENT] Child has finished. This is the last line printed by parent.\n");
+    waitpid(child2, &status, 0);
+
+    printf("[PARENT] My PID: %d\n", (int)getpid());
 
     return 0;
 }
