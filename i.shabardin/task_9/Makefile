@@ -1,11 +1,12 @@
 CC = gcc
 CFLAGS = -std=c99 -O2 -Wall -Wextra -pedantic
 TARGET = process_manager
+SRC = process_manager.c
 
 all: $(TARGET)
 
-$(TARGET): process_manager.c
-	$(CC) $(CFLAGS) -o $@ $<
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC)
 
 clean:
 	rm -f $(TARGET)
