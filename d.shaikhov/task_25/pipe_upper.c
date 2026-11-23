@@ -27,52 +27,51 @@ int main() {
     }
 
     if (pid == 0) {
-        close(pipefd[1]);
+        close(pipefd[0]);
 
-        while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-            for (int i = 0; i < bytes_read; i++) {
-                buffer[i] = toupper((unsigned char)buffer[i]);
+        while (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+            if (buffer[0] == '\n') {
+                break;
             }
 
-            printf("%.*s", (int)bytes_read, buffer);
-            fflush(stdout);
+            if (write(pipefd[1], buffer, strlen(buffer)) == -1) {
+                printf("Write error\n");
+                break;
+            }
         }
 
-        if (bytes_read == -1) {
-            printf("Read error\n");
-        }
-
-        close(pipefd[0]);
+        close(pipefd[1]);
         exit(0);
     }
 
-    close(pipefd[0]);
+    close(pipefd[1]);
 
     printf("[PARENT] Pipe created successfully!\n");
     printf("[PARENT] Enter text (empty line or Ctrl+D to exit):\n");
+    printf("> ");
+    fflush(stdout);
 
-    while (1) {
-        printf("> ");
+    while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
+        for (int i = 0; i < bytes_read; i++) {
+            char c = toupper((unsigned char)buffer[i]);
+            putchar(c);
+
+            if (c == '\n') {
+                printf("> ");
+            }
+        }
+
         fflush(stdout);
-
-        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
-            break;
-        }
-
-        if (buffer[0] == '\n') {
-            break;
-        }
-
-        if (write(pipefd[1], buffer, strlen(buffer)) == -1) {
-            printf("Write error\n");
-            break;
-        }
     }
 
-    close(pipefd[1]);
+    if (bytes_read == -1) {
+        printf("Read error\n");
+    }
+
+    close(pipefd[0]);
     wait(NULL);
 
-    printf("[PARENT] Child finished. Program terminated.\n");
+    printf("\n[PARENT] Child finished. Program terminated.\n");
 
     return 0;
 }
